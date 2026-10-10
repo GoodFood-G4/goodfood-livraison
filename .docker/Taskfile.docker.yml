@@ -1,0 +1,32 @@
+version: '3'
+
+tasks:
+  up:
+    desc: Démarre le service Livraison en mode développement (hot-reload)
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - docker compose up -d --build
+
+  down:
+    desc: Arrête le service Livraison
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - docker compose down
+
+  logs:
+    desc: Affiche les logs du service Livraison
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - docker compose logs -f
+
+  build:
+    desc: Construit l'image Docker du service Livraison
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - docker compose build
+
+  up-prod:
+    desc: Démarre le service Livraison en mode production (sans hot-reload)
+    dir: '{{.TASKFILE_DIR}}'
+    cmds:
+      - docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build

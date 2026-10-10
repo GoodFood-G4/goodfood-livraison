@@ -1,0 +1,27 @@
+version: '3'
+
+includes:
+  docker:
+    taskfile: ./.docker/Taskfile.docker.yml
+    dir: ./.docker
+
+tasks:
+  test:
+    desc: Lance la suite de tests Jest
+    cmds:
+      - npm run test
+
+  test:cov:
+    desc: Lance les tests avec couverture (lcov, seuil 80% sur domain/application)
+    cmds:
+      - npm run test:cov
+
+  lint:
+    desc: Lance le linter ESLint
+    cmds:
+      - npm run lint
+
+  format:
+    desc: Formate le code avec Prettier
+    cmds:
+      - npm run format

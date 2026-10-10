@@ -1,0 +1,7 @@
+services:
+  livraison-service:
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    ports:
+      - "3003:3003"

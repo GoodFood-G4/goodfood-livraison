@@ -1,0 +1,39 @@
+services:
+  livraison-service:
+    build:
+      context: ..
+      dockerfile: .docker/Dockerfile
+    container_name: livraison-service
+    env_file:
+      - ../.env
+    depends_on:
+      livraison-db:
+        condition: service_healthy
+    networks:
+      - goodfood-network
+
+  livraison-db:
+    image: postgres:16
+    container_name: livraison-db
+    environment:
+      # Doit rester cohérent avec DATABASE_URL du .env (base dédiée à ce service).
+      POSTGRES_USER: livraison
+      POSTGRES_PASSWORD: livraison
+      POSTGRES_DB: livraison
+    volumes:
+      - livraison-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U livraison"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - goodfood-network
+
+volumes:
+  livraison-db-data:
+
+networks:
+  # Réseau partagé avec les autres microservices et le RabbitMQ du repo goodfood-infra
+  goodfood-network:
+    external: true

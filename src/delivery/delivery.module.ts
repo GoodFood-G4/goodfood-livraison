@@ -23,6 +23,8 @@ import { DeliveryOrmEntity } from './infrastructure/persistence/delivery.orm-ent
 import { TypeOrmDeliveryRepository } from './infrastructure/persistence/typeorm-delivery.repository';
 import { RabbitMqDeliveryEventPublisher } from './infrastructure/messaging/rabbitmq-delivery-event-publisher';
 import { OrderReadyConsumer } from './infrastructure/messaging/order-ready.consumer';
+import { UNIT_OF_WORK } from './application/unit-of-work.port';
+import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-work';
 import { DeliveryController } from './presentation/delivery.controller';
 
 @Module({
@@ -44,6 +46,7 @@ import { DeliveryController } from './presentation/delivery.controller';
     HandleOrderReadyUseCase,
     OrderReadyConsumer,
     { provide: DELIVERY_REPOSITORY, useClass: TypeOrmDeliveryRepository },
+    { provide: UNIT_OF_WORK, useClass: TypeOrmUnitOfWork },
     {
       provide: DELIVERY_EVENT_PUBLISHER,
       useClass: RabbitMqDeliveryEventPublisher,

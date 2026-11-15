@@ -1,8 +1,10 @@
 import { Type } from 'class-transformer';
 import {
+  IsDefined,
   IsISO8601,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -50,10 +52,15 @@ export class OrderReadyMessageDto {
   @IsUUID()
   franchise_id!: string;
 
+  // IsDefined + IsObject : sans eux, ValidateNested laisse passer un objet absent.
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => OrderReadyAddressSnapshotDto)
   delivery_address!: OrderReadyAddressSnapshotDto;
 
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => OrderReadyAddressSnapshotDto)
   pickup_address!: OrderReadyAddressSnapshotDto;

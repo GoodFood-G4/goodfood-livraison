@@ -36,8 +36,14 @@ Règles portées par l'entité `Delivery` (pas par les use cases) :
   course simultanée entre deux livreurs est tranchée par le verrou optimiste (`version`) en
   persistance.
 - `advanceTo` : seule la transition suivante dans la chaîne est valide, et seulement par le
-  livreur assigné, sinon `InvalidStatusTransitionError` (409) ou `NotAssignedCourierError` (403).
-- `updateLocation` : uniquement entre `assigned` et `in_transit`, par le livreur assigné.
+  livreur assigné, sinon `InvalidStatusTransitionError` (409) ou `DeliveryNotFoundError` (404 :
+  pour un autre livreur, la livraison « n'existe pas »).
+- `updateLocation` : uniquement entre `assigned` et `in_transit`, par le livreur assigné, sinon
+  `LocationUpdateNotAllowedError` (409, message dédié si la livraison est terminée) ou
+  `DeliveryNotFoundError` (404).
+- Chaque étape fige sa date : `acceptedAt`, `pickedUpAt`, `startedAt` (`in_transit`),
+  `deliveredAt`. Exposées en `assigned_at`, `picked_up_at`, `started_at`, `completed_at` par
+  l'API, et reprises telles quelles comme date des événements `delivery.*`.
 - Un livreur ne peut pas dépasser `MAX_ACTIVE_DELIVERIES_PER_COURIER` livraisons actives
   (`assigned`/`picked_up`/`in_transit`), sinon `CourierBusyError` (409).
 
@@ -54,12 +60,15 @@ sequenceDiagram
     RabbitMQ->>Livraison: livraison.queue
     Livraison->>Livraison: HandleOrderReadyUseCase
     Livraison->>DB: idempotence : livraison déjà créée pour order_id ?
-    alt déjà existante
+    alt message invalide ou erreur définitive
+        Livraison-->>RabbitMQ: nack sans requeue (→ livraison.dlq)
+    else erreur transitoire (1re livraison du message)
+        Livraison-->>RabbitMQ: attente 2 s puis nack avec requeue
+    else déjà existante
         Livraison-->>RabbitMQ: ack (aucune duplication)
     else nouvelle commande
-        Livraison->>Livraison: CreateAddress x2 (géocodage si besoin)
-        Livraison->>Livraison: CreateDelivery (status=pending)
-        Livraison->>DB: persiste adresses + livraison
+        Livraison->>Livraison: géocode les adresses sans coordonnées (aucune écriture)
+        Livraison->>DB: UNE transaction (UnitOfWork) : 2 adresses + livraison pending
         Livraison-->>RabbitMQ: ack
     end
 
@@ -76,9 +85,18 @@ polling de `GET /deliveries/:id`.
   si RabbitMQ est injoignable, la requête HTTP ne doit pas échouer). Un pattern outbox
   (table d'évènements + relai transactionnel) garantirait la publication at-least-once ; hors
   scope de ce POC.
-- **Pas de dead-letter queue** : un message `order.ready` invalide ou dont l'adresse n'est pas
-  géocodable est `nack` sans requeue, mais n'est pas routé vers une DLQ (celle-ci sera
-  configurée dans `goodfood-infra`).
+- **Dead-letter queue gérée par l'infra** : un message `order.ready` rejeté (`nack` sans
+  requeue) part dans `livraison.dlq` (policy `livraison-dlx` de `goodfood-infra`) ; ce repo ne
+  déclare rien pour ça.
+- **Remise en file en liste blanche** : le consommateur ne remet en file que les erreurs
+  d'infrastructure reconnues comme transitoires (`isTransientInfrastructureError` : codes réseau
+  `ECONNREFUSED`/`ETIMEDOUT`…, SQLSTATE `08xxx`/`57P0x`/`53300`/`40001`/`40P01`, `23505` pour une
+  course entre deux `order.ready`, messages `pg` de connexion coupée). Après 2 s d'attente, et
+  une seule fois : un message déjà `redelivered` dont l'erreur persiste part en DLQ. Tout le
+  reste (message invalide, adresse non géocodable, TypeError ou autre bug) part directement en
+  DLQ. Cela évite la boucle de requeue infinie observée avec un `pickup_address` absent.
+  Compromis : un message redélivré pour une autre raison (crash du consommateur avant `ack`)
+  n'a plus droit à une remise en file en cas d'erreur transitoire.
 - **Haversine plutôt que PostGIS** : la recherche de livraisons disponibles par rayon utilise une
   formule de Haversine en SQL brut avec pré-filtre bounding box, plutôt qu'une extension
   géospatiale dédiée. Suffisant pour le volume d'un POC, mais moins précis et moins performant

@@ -11,10 +11,7 @@ import {
   DeliveryRepository,
   DELIVERY_REPOSITORY,
 } from '../domain/delivery-repository.port';
-import {
-  DeliveryNotFoundError,
-  NotDeliveryViewerError,
-} from '../domain/errors';
+import { DeliveryNotFoundError } from '../domain/errors';
 import { AVERAGE_COURIER_SPEED_KMH } from './config-tokens';
 
 export interface GetDeliveryInput {
@@ -82,6 +79,7 @@ export class GetDeliveryUseCase {
     if (actor.role === Role.COURIER && delivery.courierId === actor.userId) {
       return;
     }
-    throw new NotDeliveryViewerError();
+    // Livraison d'un autre utilisateur : 404, on ne révèle pas son existence.
+    throw new DeliveryNotFoundError(delivery.id);
   }
 }

@@ -96,6 +96,25 @@ describe('DeliveryController', () => {
     await request(app.getHttpServer()).get('/deliveries/any-id').expect(401);
   });
 
+  it('401 si le token est expiré (claim exp dépassé)', async () => {
+    const nowInSeconds = Math.floor(Date.now() / 1000);
+    const expiredToken = jwtService.sign(
+      {
+        sub: '11111111-1111-4111-8111-111111111111',
+        role: Role.COURIER,
+        iat: nowInSeconds - 2 * 86400,
+        exp: nowInSeconds - 86400,
+      },
+      { algorithm: 'HS256' },
+    );
+
+    await request(app.getHttpServer())
+      .get('/deliveries/any-id')
+      .set('Authorization', `Bearer ${expiredToken}`)
+      .expect(401);
+    expect(getDeliveryUseCase.execute).not.toHaveBeenCalled();
+  });
+
   it("403 si le rôle est insuffisant (client sur POST /deliveries réservé à l'admin)", async () => {
     await request(app.getHttpServer())
       .post('/deliveries')

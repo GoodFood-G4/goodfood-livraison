@@ -44,6 +44,7 @@ export class TypeOrmDeliveryRepository implements DeliveryRepository {
         locationUpdatedAt: entity.locationUpdatedAt,
         acceptedAt: entity.acceptedAt,
         pickedUpAt: entity.pickedUpAt,
+        startedAt: entity.startedAt,
         deliveredAt: entity.deliveredAt,
         updatedAt: entity.updatedAt,
         version: delivery.version + 1,

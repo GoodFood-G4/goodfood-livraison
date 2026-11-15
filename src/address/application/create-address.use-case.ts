@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { GeoPoint } from '../../shared/domain/geo-point';
 import { Clock, CLOCK } from '../../shared/application/ports/clock.port';
 import {
   IdGenerator,
@@ -11,7 +10,7 @@ import {
   ADDRESS_REPOSITORY,
 } from '../domain/address-repository.port';
 import { Geocoder, GEOCODER } from '../domain/geocoder.port';
-import { AddressNotGeocodableError } from '../domain/errors';
+import { resolveAddressLocation } from './resolve-address-location';
 
 export interface CreateAddressInput {
   readonly country: string;
@@ -34,7 +33,7 @@ export class CreateAddressUseCase {
   ) {}
 
   async execute(input: CreateAddressInput): Promise<Address> {
-    const location = await this.resolveLocation(input);
+    const location = await resolveAddressLocation(this.geocoder, input);
 
     const address = Address.create({
       id: this.idGenerator.generate(),
@@ -50,24 +49,5 @@ export class CreateAddressUseCase {
     await this.addressRepository.save(address);
 
     return address;
-  }
-
-  private async resolveLocation(input: CreateAddressInput): Promise<GeoPoint> {
-    if (input.latitude !== undefined && input.longitude !== undefined) {
-      return GeoPoint.create(input.latitude, input.longitude);
-    }
-
-    const geocoded = await this.geocoder.geocode({
-      country: input.country,
-      street: input.street,
-      postalCode: input.postalCode,
-      city: input.city,
-    });
-
-    if (!geocoded) {
-      throw new AddressNotGeocodableError();
-    }
-
-    return geocoded;
   }
 }

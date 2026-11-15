@@ -1,8 +1,7 @@
 import { DeliveryStatus } from '../domain/delivery-status';
 import {
   DeliveryNotFoundError,
-  InvalidStatusTransitionError,
-  NotAssignedCourierError,
+  LocationUpdateNotAllowedError,
 } from '../domain/errors';
 import { UpdateCourierLocationUseCase } from './update-courier-location.use-case';
 import {
@@ -50,7 +49,7 @@ describe('UpdateCourierLocationUseCase', () => {
     ).rejects.toThrow(DeliveryNotFoundError);
   });
 
-  it('lève NotAssignedCourierError pour un livreur non assigné', async () => {
+  it('lève DeliveryNotFoundError (404) pour un livreur non assigné', async () => {
     const delivery = buildPendingDelivery();
     delivery.accept('courier-1', new Date());
     repository.deliveries.set(delivery.id, delivery);
@@ -62,7 +61,7 @@ describe('UpdateCourierLocationUseCase', () => {
         latitude: 0,
         longitude: 0,
       }),
-    ).rejects.toThrow(NotAssignedCourierError);
+    ).rejects.toThrow(DeliveryNotFoundError);
   });
 
   it('refuse une position avant acceptation (pending, aucun livreur assigné)', async () => {
@@ -76,7 +75,7 @@ describe('UpdateCourierLocationUseCase', () => {
         latitude: 0,
         longitude: 0,
       }),
-    ).rejects.toThrow(NotAssignedCourierError);
+    ).rejects.toThrow(DeliveryNotFoundError);
   });
 
   it('refuse une position après livraison (delivered)', async () => {
@@ -94,6 +93,16 @@ describe('UpdateCourierLocationUseCase', () => {
         latitude: 0,
         longitude: 0,
       }),
-    ).rejects.toThrow(InvalidStatusTransitionError);
+    ).rejects.toThrow(LocationUpdateNotAllowedError);
+    await expect(
+      useCase.execute({
+        deliveryId: delivery.id,
+        courierId: 'courier-1',
+        latitude: 0,
+        longitude: 0,
+      }),
+    ).rejects.toThrow(
+      'La position ne peut plus être mise à jour : la livraison est terminée',
+    );
   });
 });

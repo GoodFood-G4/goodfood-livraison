@@ -22,6 +22,7 @@ export interface RawDeliveryRow {
   location_updated_at: Date | null;
   accepted_at: Date | null;
   picked_up_at: Date | null;
+  started_at: Date | null;
   delivered_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -50,6 +51,7 @@ export class DeliveryMapper {
         locationUpdatedAt: row.location_updated_at,
         acceptedAt: row.accepted_at,
         pickedUpAt: row.picked_up_at,
+        startedAt: row.started_at,
         deliveredAt: row.delivered_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -74,6 +76,7 @@ export class DeliveryMapper {
       locationUpdatedAt: entity.locationUpdatedAt,
       acceptedAt: entity.acceptedAt,
       pickedUpAt: entity.pickedUpAt,
+      startedAt: entity.startedAt,
       deliveredAt: entity.deliveredAt,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
@@ -96,6 +99,7 @@ export class DeliveryMapper {
     entity.locationUpdatedAt = delivery.locationUpdatedAt;
     entity.acceptedAt = delivery.acceptedAt;
     entity.pickedUpAt = delivery.pickedUpAt;
+    entity.startedAt = delivery.startedAt;
     entity.deliveredAt = delivery.deliveredAt;
     entity.createdAt = delivery.createdAt;
     entity.updatedAt = delivery.updatedAt;

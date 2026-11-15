@@ -1,8 +1,4 @@
-import {
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-} from '../../shared/domain/domain-error';
+import { ConflictError, NotFoundError } from '../../shared/domain/domain-error';
 import { DeliveryStatus } from './delivery-status';
 
 export class DeliveryNotFoundError extends NotFoundError {
@@ -29,10 +25,16 @@ export class InvalidStatusTransitionError extends ConflictError {
   }
 }
 
-export class NotAssignedCourierError extends ForbiddenError {
-  constructor() {
+/**
+ * Mise à jour de position hors des statuts actifs. Distincte des erreurs de
+ * transition : le statut ne change pas, c'est la position qui est refusée.
+ */
+export class LocationUpdateNotAllowedError extends ConflictError {
+  constructor(status: DeliveryStatus) {
     super(
-      'Seul le livreur assigné à cette livraison peut effectuer cette action',
+      status === DeliveryStatus.DELIVERED
+        ? 'La position ne peut plus être mise à jour : la livraison est terminée'
+        : `La position ne peut pas être mise à jour : la livraison n'est pas en cours (statut ${status})`,
     );
   }
 }
@@ -42,11 +44,5 @@ export class CourierBusyError extends ConflictError {
     super(
       `Le livreur a déjà atteint sa limite de ${maxActiveDeliveries} livraisons actives`,
     );
-  }
-}
-
-export class NotDeliveryViewerError extends ForbiddenError {
-  constructor() {
-    super('Vous ne pouvez pas consulter cette livraison');
   }
 }

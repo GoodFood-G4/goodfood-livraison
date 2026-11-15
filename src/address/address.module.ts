@@ -19,6 +19,11 @@ import { AddressController } from './presentation/address.controller';
     { provide: ADDRESS_REPOSITORY, useClass: TypeOrmAddressRepository },
     { provide: GEOCODER, useClass: NominatimGeocoder },
   ],
-  exports: [CreateAddressUseCase, GetAddressUseCase, ADDRESS_REPOSITORY],
+  exports: [
+    CreateAddressUseCase,
+    GetAddressUseCase,
+    ADDRESS_REPOSITORY,
+    GEOCODER,
+  ],
 })
 export class AddressModule {}

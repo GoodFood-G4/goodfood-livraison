@@ -5,7 +5,7 @@ import {
   AddressRepository,
   ADDRESS_REPOSITORY,
 } from '../domain/address-repository.port';
-import { AddressNotFoundError, NotAddressOwnerError } from '../domain/errors';
+import { AddressNotFoundError } from '../domain/errors';
 
 export interface GetAddressInput {
   readonly addressId: string;
@@ -22,15 +22,13 @@ export class GetAddressUseCase {
   async execute(input: GetAddressInput): Promise<Address> {
     const address = await this.addressRepository.findById(input.addressId);
 
-    if (!address) {
-      throw new AddressNotFoundError(input.addressId);
-    }
-
-    const isOwner = address.createdBy === input.actor.userId;
+    const isOwner = address?.createdBy === input.actor.userId;
     const isAdmin = input.actor.role === Role.ADMIN;
 
-    if (!isOwner && !isAdmin) {
-      throw new NotAddressOwnerError();
+    // L'adresse d'un autre utilisateur est traitée comme introuvable (404) :
+    // on ne révèle pas son existence.
+    if (!address || (!isOwner && !isAdmin)) {
+      throw new AddressNotFoundError(input.addressId);
     }
 
     return address;

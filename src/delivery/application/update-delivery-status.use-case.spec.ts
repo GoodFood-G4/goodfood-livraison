@@ -2,7 +2,6 @@ import { DeliveryStatus } from '../domain/delivery-status';
 import {
   DeliveryNotFoundError,
   InvalidStatusTransitionError,
-  NotAssignedCourierError,
 } from '../domain/errors';
 import { UpdateDeliveryStatusUseCase } from './update-delivery-status.use-case';
 import {
@@ -65,6 +64,31 @@ describe('UpdateDeliveryStatusUseCase', () => {
     ]);
   });
 
+  it('publie exactement les dates stockées sur la livraison', async () => {
+    const delivery = buildPendingDelivery();
+    delivery.accept('courier-1', new Date('2026-01-01T01:00:00.000Z'));
+    repository.deliveries.set(delivery.id, delivery);
+
+    for (const status of [
+      DeliveryStatus.PICKED_UP,
+      DeliveryStatus.IN_TRANSIT,
+      DeliveryStatus.DELIVERED,
+    ]) {
+      await useCase.execute({
+        deliveryId: delivery.id,
+        courierId: 'courier-1',
+        status,
+      });
+    }
+
+    expect(publisher.published.map((p) => p.payload.occurredAt)).toEqual([
+      delivery.pickedUpAt,
+      delivery.startedAt,
+      delivery.deliveredAt,
+    ]);
+    expect(delivery.startedAt).toEqual(new Date('2026-01-01T02:00:00.000Z'));
+  });
+
   it('lève DeliveryNotFoundError si absente', async () => {
     await expect(
       useCase.execute({
@@ -89,7 +113,7 @@ describe('UpdateDeliveryStatusUseCase', () => {
     ).rejects.toThrow(InvalidStatusTransitionError);
   });
 
-  it('lève NotAssignedCourierError pour un livreur non assigné', async () => {
+  it('lève DeliveryNotFoundError (404) pour un livreur non assigné', async () => {
     const delivery = buildPendingDelivery();
     delivery.accept('courier-1', new Date());
     repository.deliveries.set(delivery.id, delivery);
@@ -100,6 +124,6 @@ describe('UpdateDeliveryStatusUseCase', () => {
         courierId: 'courier-2',
         status: DeliveryStatus.PICKED_UP,
       }),
-    ).rejects.toThrow(NotAssignedCourierError);
+    ).rejects.toThrow(DeliveryNotFoundError);
   });
 });

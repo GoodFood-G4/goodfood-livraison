@@ -106,8 +106,14 @@ export class DeliveryController {
   @Roles(Role.COURIER)
   @ApiResponse({ status: 200, description: 'Livraison acceptée' })
   @ApiResponse({
+    status: 403,
+    description: 'Rôle non autorisé (livreur requis)',
+  })
+  @ApiResponse({ status: 404, description: 'Livraison introuvable' })
+  @ApiResponse({
     status: 409,
-    description: 'Déjà assignée ou livreur trop chargé',
+    description:
+      "Déjà assignée (à soi ou à un autre livreur : une livraison pending est visible de tous les livreurs, le perdant d'une course reçoit 409) ou livreur trop chargé",
   })
   async accept(
     @Param('id') id: string,
@@ -123,6 +129,15 @@ export class DeliveryController {
   @Patch(':id/status')
   @Roles(Role.COURIER)
   @ApiResponse({ status: 200, description: 'Statut mis à jour' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rôle non autorisé (livreur requis)',
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      "Livraison introuvable ou assignée à un autre livreur (son existence n'est pas révélée)",
+  })
   @ApiResponse({ status: 409, description: 'Transition de statut invalide' })
   async updateStatus(
     @Param('id') id: string,
@@ -141,6 +156,20 @@ export class DeliveryController {
   @Roles(Role.COURIER)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiResponse({ status: 204, description: 'Position mise à jour' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rôle non autorisé (livreur requis)',
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      "Livraison introuvable ou assignée à un autre livreur (son existence n'est pas révélée)",
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Position refusée : livraison terminée (delivered) ou pas encore en cours',
+  })
   async updateLocation(
     @Param('id') id: string,
     @Body() dto: UpdateLocationDto,
@@ -157,13 +186,14 @@ export class DeliveryController {
   @Get(':id')
   @ApiResponse({
     status: 200,
-    description: 'Statut, adresses, position et ETA',
+    description:
+      'Statut, adresses, position, ETA et horodatages (assigned_at, picked_up_at, started_at, completed_at)',
   })
   @ApiResponse({
-    status: 403,
-    description: 'Pas autorisé à consulter cette livraison',
+    status: 404,
+    description:
+      "Livraison introuvable, ou n'appartenant pas à l'utilisateur (client d'une autre commande, livreur non assigné) : son existence n'est pas révélée. Tous les rôles sont acceptés (admin : toutes les livraisons)",
   })
-  @ApiResponse({ status: 404, description: 'Livraison introuvable' })
   async findOne(
     @Param('id') id: string,
     @CurrentActor() actor: Actor,

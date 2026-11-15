@@ -3,8 +3,9 @@ import { Delivery } from './delivery';
 import { DeliveryStatus } from './delivery-status';
 import {
   DeliveryAlreadyAssignedError,
+  DeliveryNotFoundError,
   InvalidStatusTransitionError,
-  NotAssignedCourierError,
+  LocationUpdateNotAllowedError,
 } from './errors';
 
 const NOW = new Date('2026-01-01T00:00:00.000Z');
@@ -86,7 +87,7 @@ describe('Delivery', () => {
 
       expect(() =>
         delivery.advanceTo(DeliveryStatus.PICKED_UP, 'courier-2', LATER),
-      ).toThrow(NotAssignedCourierError);
+      ).toThrow(DeliveryNotFoundError);
     });
 
     it('refuse de faire avancer une livraison déjà livrée', () => {
@@ -120,7 +121,7 @@ describe('Delivery', () => {
 
       expect(() =>
         delivery.updateLocation('courier-1', location, LATER),
-      ).toThrow(NotAssignedCourierError);
+      ).toThrow(DeliveryNotFoundError);
     });
 
     it('refuse une position après livraison (delivered)', () => {
@@ -132,7 +133,12 @@ describe('Delivery', () => {
 
       expect(() =>
         delivery.updateLocation('courier-1', location, LATER),
-      ).toThrow(InvalidStatusTransitionError);
+      ).toThrow(new LocationUpdateNotAllowedError(DeliveryStatus.DELIVERED));
+      expect(() =>
+        delivery.updateLocation('courier-1', location, LATER),
+      ).toThrow(
+        'La position ne peut plus être mise à jour : la livraison est terminée',
+      );
     });
 
     it("refuse la position d'un livreur non assigné", () => {
@@ -141,7 +147,51 @@ describe('Delivery', () => {
 
       expect(() =>
         delivery.updateLocation('courier-2', location, LATER),
-      ).toThrow(NotAssignedCourierError);
+      ).toThrow(DeliveryNotFoundError);
+    });
+  });
+
+  describe('LocationUpdateNotAllowedError', () => {
+    it('distingue livraison terminée et livraison pas encore en cours', () => {
+      expect(
+        new LocationUpdateNotAllowedError(DeliveryStatus.DELIVERED).message,
+      ).toBe(
+        'La position ne peut plus être mise à jour : la livraison est terminée',
+      );
+      expect(
+        new LocationUpdateNotAllowedError(DeliveryStatus.PENDING).message,
+      ).toBe(
+        "La position ne peut pas être mise à jour : la livraison n'est pas en cours (statut pending)",
+      );
+    });
+  });
+
+  describe('horodatages du cycle de vie', () => {
+    it('renseigne chaque date à son étape, null avant', () => {
+      const delivery = buildPendingDelivery();
+      expect([
+        delivery.acceptedAt,
+        delivery.pickedUpAt,
+        delivery.startedAt,
+        delivery.deliveredAt,
+      ]).toEqual([null, null, null, null]);
+
+      const t1 = new Date('2026-01-01T00:01:00.000Z');
+      const t2 = new Date('2026-01-01T00:02:00.000Z');
+      const t3 = new Date('2026-01-01T00:03:00.000Z');
+      const t4 = new Date('2026-01-01T00:04:00.000Z');
+      delivery.accept('courier-1', t1);
+      delivery.advanceTo(DeliveryStatus.PICKED_UP, 'courier-1', t2);
+      expect(delivery.startedAt).toBeNull();
+      delivery.advanceTo(DeliveryStatus.IN_TRANSIT, 'courier-1', t3);
+      delivery.advanceTo(DeliveryStatus.DELIVERED, 'courier-1', t4);
+
+      expect([
+        delivery.acceptedAt,
+        delivery.pickedUpAt,
+        delivery.startedAt,
+        delivery.deliveredAt,
+      ]).toEqual([t1, t2, t3, t4]);
     });
   });
 

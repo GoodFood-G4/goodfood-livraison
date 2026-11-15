@@ -51,6 +51,9 @@ export class DeliveryOrmEntity {
   @Column({ name: 'picked_up_at', type: 'timestamptz', nullable: true })
   pickedUpAt!: Date | null;
 
+  @Column({ name: 'started_at', type: 'timestamptz', nullable: true })
+  startedAt!: Date | null;
+
   @Column({ name: 'delivered_at', type: 'timestamptz', nullable: true })
   deliveredAt!: Date | null;
 

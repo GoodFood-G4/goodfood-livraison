@@ -2,7 +2,7 @@ import { GeoPoint } from '../../shared/domain/geo-point';
 import { Role } from '../../shared/application/actor';
 import { Address } from '../domain/address';
 import { AddressRepository } from '../domain/address-repository.port';
-import { AddressNotFoundError, NotAddressOwnerError } from '../domain/errors';
+import { AddressNotFoundError } from '../domain/errors';
 import { GetAddressUseCase } from './get-address.use-case';
 
 class InMemoryAddressRepository implements AddressRepository {
@@ -62,7 +62,7 @@ describe('GetAddressUseCase', () => {
     expect(result.id).toBe('address-1');
   });
 
-  it("refuse l'accès à un autre utilisateur", async () => {
+  it("traite l'adresse d'un autre utilisateur comme introuvable (404)", async () => {
     await repository.save(buildAddress('user-1'));
 
     await expect(
@@ -70,7 +70,7 @@ describe('GetAddressUseCase', () => {
         addressId: 'address-1',
         actor: { userId: 'user-2', role: Role.CUSTOMER },
       }),
-    ).rejects.toThrow(NotAddressOwnerError);
+    ).rejects.toThrow(AddressNotFoundError);
   });
 
   it('lève AddressNotFoundError si absente', async () => {

@@ -1,10 +1,7 @@
 import { Role } from '../../shared/application/actor';
 import { GeoPoint } from '../../shared/domain/geo-point';
 import { DeliveryStatus } from '../domain/delivery-status';
-import {
-  DeliveryNotFoundError,
-  NotDeliveryViewerError,
-} from '../domain/errors';
+import { DeliveryNotFoundError } from '../domain/errors';
 import { GetDeliveryUseCase } from './get-delivery.use-case';
 import {
   InMemoryAddressRepository,
@@ -58,7 +55,7 @@ describe('GetDeliveryUseCase', () => {
         deliveryId: delivery.id,
         actor: { userId: 'customer-2', role: Role.CUSTOMER },
       }),
-    ).rejects.toThrow(NotDeliveryViewerError);
+    ).rejects.toThrow(DeliveryNotFoundError);
   });
 
   it('autorise le livreur assigné', async () => {
@@ -84,7 +81,7 @@ describe('GetDeliveryUseCase', () => {
         deliveryId: delivery.id,
         actor: { userId: 'courier-2', role: Role.COURIER },
       }),
-    ).rejects.toThrow(NotDeliveryViewerError);
+    ).rejects.toThrow(DeliveryNotFoundError);
   });
 
   it('autorise un admin quel que soit le propriétaire', async () => {

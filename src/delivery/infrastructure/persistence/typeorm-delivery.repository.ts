@@ -44,6 +44,7 @@ export class TypeOrmDeliveryRepository implements DeliveryRepository {
         locationUpdatedAt: entity.locationUpdatedAt,
         acceptedAt: entity.acceptedAt,
         pickedUpAt: entity.pickedUpAt,
+        startedAt: entity.startedAt,
         deliveredAt: entity.deliveredAt,
         updatedAt: entity.updatedAt,
         version: delivery.version + 1,
@@ -143,6 +144,24 @@ export class TypeOrmDeliveryRepository implements DeliveryRepository {
   ): Promise<Paginated<Delivery>> {
     const [entities, total] = await this.repository.findAndCount({
       where: { courierId },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      data: entities.map((entity) => DeliveryMapper.toDomain(entity)),
+      meta: { page, limit, total },
+    };
+  }
+
+  async findForCustomer(
+    customerId: string,
+    page: number,
+    limit: number,
+  ): Promise<Paginated<Delivery>> {
+    const [entities, total] = await this.repository.findAndCount({
+      where: { customerId },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,

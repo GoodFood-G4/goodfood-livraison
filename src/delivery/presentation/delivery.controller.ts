@@ -18,6 +18,7 @@ import { CreateDeliveryUseCase } from '../application/create-delivery.use-case';
 import { GetDeliveryUseCase } from '../application/get-delivery.use-case';
 import { ListAvailableDeliveriesUseCase } from '../application/list-available-deliveries.use-case';
 import { ListCourierHistoryUseCase } from '../application/list-courier-history.use-case';
+import { ListCustomerDeliveriesUseCase } from '../application/list-customer-deliveries.use-case';
 import { UpdateCourierLocationUseCase } from '../application/update-courier-location.use-case';
 import { UpdateDeliveryStatusUseCase } from '../application/update-delivery-status.use-case';
 import { AvailableDeliveryResponseDto } from './dto/available-delivery-response.dto';
@@ -45,6 +46,7 @@ export class DeliveryController {
     private readonly updateCourierLocationUseCase: UpdateCourierLocationUseCase,
     private readonly getDeliveryUseCase: GetDeliveryUseCase,
     private readonly listCourierHistoryUseCase: ListCourierHistoryUseCase,
+    private readonly listCustomerDeliveriesUseCase: ListCustomerDeliveriesUseCase,
   ) {}
 
   @Post()
@@ -68,7 +70,8 @@ export class DeliveryController {
   @Roles(Role.COURIER)
   @ApiResponse({
     status: 200,
-    description: 'Livraisons pending dans le rayon, triées par distance',
+    description:
+      "Livraisons pending dans le rayon, triées par distance. Adresse de retrait et longueur de la course incluses ; l'adresse du client n'est pas exposée.",
   })
   async listAvailable(
     @Query() query: ListAvailableQueryDto,
@@ -78,8 +81,8 @@ export class DeliveryController {
       longitude: query.lng,
       radiusKm: query.radius,
     });
-    return results.map((result) =>
-      AvailableDeliveryResponseDto.fromResult(result),
+    return results.map((offer) =>
+      AvailableDeliveryResponseDto.fromOffer(offer),
     );
   }
 
@@ -102,12 +105,38 @@ export class DeliveryController {
     return DeliveryHistoryResponseDto.fromPaginated(paginated);
   }
 
+  // Doit être déclaré avant @Get(':id') pour ne pas être capturé par celui-ci.
+  @Get('mine')
+  @Roles(Role.CUSTOMER)
+  @ApiResponse({
+    status: 200,
+    description:
+      'Livraisons du client connecté (customer_id = sub du token), paginées, plus récentes en premier',
+  })
+  async mine(
+    @Query() query: HistoryQueryDto,
+    @CurrentActor() actor: Actor,
+  ): Promise<DeliveryHistoryResponseDto> {
+    const paginated = await this.listCustomerDeliveriesUseCase.execute({
+      customerId: actor.userId,
+      page: query.page ?? DEFAULT_HISTORY_PAGE,
+      limit: query.limit ?? DEFAULT_HISTORY_LIMIT,
+    });
+    return DeliveryHistoryResponseDto.fromPaginated(paginated);
+  }
+
   @Patch(':id/accept')
   @Roles(Role.COURIER)
   @ApiResponse({ status: 200, description: 'Livraison acceptée' })
   @ApiResponse({
+    status: 403,
+    description: 'Rôle non autorisé (livreur requis)',
+  })
+  @ApiResponse({ status: 404, description: 'Livraison introuvable' })
+  @ApiResponse({
     status: 409,
-    description: 'Déjà assignée ou livreur trop chargé',
+    description:
+      "Déjà assignée (à soi ou à un autre livreur : une livraison pending est visible de tous les livreurs, le perdant d'une course reçoit 409) ou livreur trop chargé",
   })
   async accept(
     @Param('id') id: string,
@@ -123,6 +152,15 @@ export class DeliveryController {
   @Patch(':id/status')
   @Roles(Role.COURIER)
   @ApiResponse({ status: 200, description: 'Statut mis à jour' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rôle non autorisé (livreur requis)',
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      "Livraison introuvable ou assignée à un autre livreur (son existence n'est pas révélée)",
+  })
   @ApiResponse({ status: 409, description: 'Transition de statut invalide' })
   async updateStatus(
     @Param('id') id: string,
@@ -141,6 +179,20 @@ export class DeliveryController {
   @Roles(Role.COURIER)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiResponse({ status: 204, description: 'Position mise à jour' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rôle non autorisé (livreur requis)',
+  })
+  @ApiResponse({
+    status: 404,
+    description:
+      "Livraison introuvable ou assignée à un autre livreur (son existence n'est pas révélée)",
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Position refusée : livraison terminée (delivered) ou pas encore en cours',
+  })
   async updateLocation(
     @Param('id') id: string,
     @Body() dto: UpdateLocationDto,
@@ -157,13 +209,14 @@ export class DeliveryController {
   @Get(':id')
   @ApiResponse({
     status: 200,
-    description: 'Statut, adresses, position et ETA',
+    description:
+      'Statut, adresses, position, ETA et horodatages (assigned_at, picked_up_at, started_at, completed_at)',
   })
   @ApiResponse({
-    status: 403,
-    description: 'Pas autorisé à consulter cette livraison',
+    status: 404,
+    description:
+      "Livraison introuvable, ou n'appartenant pas à l'utilisateur (client d'une autre commande, livreur non assigné) : son existence n'est pas révélée. Tous les rôles sont acceptés (admin : toutes les livraisons)",
   })
-  @ApiResponse({ status: 404, description: 'Livraison introuvable' })
   async findOne(
     @Param('id') id: string,
     @CurrentActor() actor: Actor,

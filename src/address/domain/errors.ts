@@ -1,5 +1,4 @@
 import {
-  ForbiddenError,
   NotFoundError,
   UnprocessableError,
 } from '../../shared/domain/domain-error';
@@ -7,14 +6,6 @@ import {
 export class AddressNotFoundError extends NotFoundError {
   constructor(addressId: string) {
     super(`Adresse introuvable : ${addressId}`);
-  }
-}
-
-export class NotAddressOwnerError extends ForbiddenError {
-  constructor() {
-    super(
-      "Seul le créateur de l'adresse ou un administrateur peut la consulter",
-    );
   }
 }
 

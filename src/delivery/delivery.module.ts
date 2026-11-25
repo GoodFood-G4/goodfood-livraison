@@ -17,12 +17,15 @@ import { GetDeliveryUseCase } from './application/get-delivery.use-case';
 import { HandleOrderReadyUseCase } from './application/handle-order-ready.use-case';
 import { ListAvailableDeliveriesUseCase } from './application/list-available-deliveries.use-case';
 import { ListCourierHistoryUseCase } from './application/list-courier-history.use-case';
+import { ListCustomerDeliveriesUseCase } from './application/list-customer-deliveries.use-case';
 import { UpdateCourierLocationUseCase } from './application/update-courier-location.use-case';
 import { UpdateDeliveryStatusUseCase } from './application/update-delivery-status.use-case';
 import { DeliveryOrmEntity } from './infrastructure/persistence/delivery.orm-entity';
 import { TypeOrmDeliveryRepository } from './infrastructure/persistence/typeorm-delivery.repository';
 import { RabbitMqDeliveryEventPublisher } from './infrastructure/messaging/rabbitmq-delivery-event-publisher';
 import { OrderReadyConsumer } from './infrastructure/messaging/order-ready.consumer';
+import { UNIT_OF_WORK } from './application/unit-of-work.port';
+import { TypeOrmUnitOfWork } from './infrastructure/persistence/typeorm-unit-of-work';
 import { DeliveryController } from './presentation/delivery.controller';
 
 @Module({
@@ -41,9 +44,11 @@ import { DeliveryController } from './presentation/delivery.controller';
     GetDeliveryUseCase,
     ListAvailableDeliveriesUseCase,
     ListCourierHistoryUseCase,
+    ListCustomerDeliveriesUseCase,
     HandleOrderReadyUseCase,
     OrderReadyConsumer,
     { provide: DELIVERY_REPOSITORY, useClass: TypeOrmDeliveryRepository },
+    { provide: UNIT_OF_WORK, useClass: TypeOrmUnitOfWork },
     {
       provide: DELIVERY_EVENT_PUBLISHER,
       useClass: RabbitMqDeliveryEventPublisher,

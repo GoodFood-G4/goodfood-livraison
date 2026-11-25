@@ -42,8 +42,7 @@ export class AcceptDeliveryUseCase {
       throw new CourierBusyError(this.maxActiveDeliveries);
     }
 
-    const occurredAt = this.clock.now();
-    delivery.accept(input.courierId, occurredAt);
+    delivery.accept(input.courierId, this.clock.now());
 
     // Le verrou optimiste (version) tranche la course simultanée côté persistance :
     // un save() en conflit est traduit en DeliveryAlreadyAssignedError par l'adaptateur.
@@ -54,7 +53,8 @@ export class AcceptDeliveryUseCase {
       orderId: delivery.orderId,
       customerId: delivery.customerId,
       courierId: delivery.courierId,
-      occurredAt,
+      // Exactement la date stockée (assigned_at exposé par GET /deliveries/:id).
+      occurredAt: delivery.acceptedAt as Date,
     });
 
     return delivery;

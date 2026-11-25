@@ -1,3 +1,7 @@
+# Nom de projet Compose explicite : sans lui, Compose dériverait le nom du dossier `.docker/`
+# (« docker »), partagé avec Commande et Paiement, d'où des « orphan containers » croisés.
+name: goodfood-livraison
+
 services:
   livraison-service:
     build:

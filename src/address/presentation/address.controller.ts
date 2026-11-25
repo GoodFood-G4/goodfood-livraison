@@ -46,8 +46,11 @@ export class AddressController {
 
   @Get(':id')
   @ApiResponse({ status: 200, description: 'Adresse' })
-  @ApiResponse({ status: 403, description: "Pas le créateur de l'adresse" })
-  @ApiResponse({ status: 404, description: 'Adresse introuvable' })
+  @ApiResponse({
+    status: 404,
+    description:
+      "Adresse introuvable ou créée par un autre utilisateur (son existence n'est pas révélée). Tous les rôles sont acceptés (admin : toutes les adresses)",
+  })
   async findOne(
     @Param('id') id: string,
     @CurrentActor() actor: Actor,

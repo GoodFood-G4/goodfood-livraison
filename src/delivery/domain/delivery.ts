@@ -6,8 +6,9 @@ import {
 } from './delivery-status';
 import {
   DeliveryAlreadyAssignedError,
+  DeliveryNotFoundError,
   InvalidStatusTransitionError,
-  NotAssignedCourierError,
+  LocationUpdateNotAllowedError,
 } from './errors';
 
 export interface DeliveryProps {
@@ -23,6 +24,7 @@ export interface DeliveryProps {
   locationUpdatedAt: Date | null;
   acceptedAt: Date | null;
   pickedUpAt: Date | null;
+  startedAt: Date | null;
   deliveredAt: Date | null;
   readonly createdAt: Date;
   updatedAt: Date;
@@ -56,6 +58,7 @@ export class Delivery {
       locationUpdatedAt: null,
       acceptedAt: null,
       pickedUpAt: null,
+      startedAt: null,
       deliveredAt: null,
       updatedAt: props.createdAt,
       version: 1,
@@ -114,6 +117,10 @@ export class Delivery {
     return this.props.pickedUpAt;
   }
 
+  get startedAt(): Date | null {
+    return this.props.startedAt;
+  }
+
   get deliveredAt(): Date | null {
     return this.props.deliveredAt;
   }
@@ -169,6 +176,9 @@ export class Delivery {
     if (targetStatus === DeliveryStatus.PICKED_UP) {
       this.props.pickedUpAt = occurredAt;
     }
+    if (targetStatus === DeliveryStatus.IN_TRANSIT) {
+      this.props.startedAt = occurredAt;
+    }
     if (targetStatus === DeliveryStatus.DELIVERED) {
       this.props.deliveredAt = occurredAt;
     }
@@ -183,10 +193,7 @@ export class Delivery {
     this.assertAssignedCourier(courierId);
 
     if (!this.isActive()) {
-      throw new InvalidStatusTransitionError(
-        this.props.status,
-        this.props.status,
-      );
+      throw new LocationUpdateNotAllowedError(this.props.status);
     }
 
     this.props.courierLocation = location;
@@ -194,9 +201,14 @@ export class Delivery {
     this.props.updatedAt = occurredAt;
   }
 
+  /**
+   * Pour un livreur autre que l'assigné, la livraison « n'existe pas » : on lève
+   * la même erreur qu'une livraison introuvable (404) pour ne pas révéler son
+   * existence.
+   */
   private assertAssignedCourier(courierId: string): void {
     if (this.props.courierId !== courierId) {
-      throw new NotAssignedCourierError();
+      throw new DeliveryNotFoundError(this.props.id);
     }
   }
 }

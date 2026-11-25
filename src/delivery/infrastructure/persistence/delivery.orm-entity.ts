@@ -8,6 +8,7 @@ export class DeliveryOrmEntity {
   @Column({ name: 'order_id', type: 'uuid', unique: true })
   orderId!: string;
 
+  @Index('IDX_deliveries_customer_id')
   @Column({ name: 'customer_id', type: 'uuid', nullable: true })
   customerId!: string | null;
 
@@ -50,6 +51,9 @@ export class DeliveryOrmEntity {
 
   @Column({ name: 'picked_up_at', type: 'timestamptz', nullable: true })
   pickedUpAt!: Date | null;
+
+  @Column({ name: 'started_at', type: 'timestamptz', nullable: true })
+  startedAt!: Date | null;
 
   @Column({ name: 'delivered_at', type: 'timestamptz', nullable: true })
   deliveredAt!: Date | null;

@@ -1,8 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Address } from '../../../address/domain/address';
+import { toUtcIsoSeconds } from '../../../shared/application/utc-date-format';
 import { DeliveryDetails } from '../../application/get-delivery.use-case';
+import { DeliveryTimestampsDto } from './delivery-response.dto';
 
-class AddressSummaryDto {
+export class AddressSummaryDto {
   @ApiProperty() id!: string;
   @ApiProperty() country!: string;
   @ApiProperty() street!: string;
@@ -27,9 +29,15 @@ class AddressSummaryDto {
 class CourierLocationDto {
   @ApiProperty() latitude!: number;
   @ApiProperty() longitude!: number;
+  @ApiProperty({
+    name: 'updated_at',
+    example: '2026-11-11T21:55:25Z',
+    description: 'Date de la dernière position reçue (UTC, à la seconde)',
+  })
+  updated_at!: string;
 }
 
-export class DeliveryDetailResponseDto {
+export class DeliveryDetailResponseDto extends DeliveryTimestampsDto {
   @ApiProperty() id!: string;
   @ApiProperty({ name: 'order_id' }) order_id!: string;
   @ApiProperty({ nullable: true, name: 'customer_id' }) customer_id!:
@@ -55,14 +63,6 @@ export class DeliveryDetailResponseDto {
   courier_location!: CourierLocationDto | null;
   @ApiProperty({ nullable: true, name: 'eta_minutes' }) eta_minutes!:
     number | null;
-  @ApiProperty({ nullable: true, name: 'accepted_at' }) accepted_at!:
-    string | null;
-  @ApiProperty({ nullable: true, name: 'picked_up_at' }) picked_up_at!:
-    string | null;
-  @ApiProperty({ nullable: true, name: 'delivered_at' }) delivered_at!:
-    string | null;
-  @ApiProperty({ name: 'created_at' }) created_at!: string;
-  @ApiProperty({ name: 'updated_at' }) updated_at!: string;
 
   static fromDetails(details: DeliveryDetails): DeliveryDetailResponseDto {
     const { delivery } = details;
@@ -79,18 +79,15 @@ export class DeliveryDetailResponseDto {
     dto.destination_address = AddressSummaryDto.fromDomain(
       details.destinationAddress,
     );
-    dto.courier_location = delivery.courierLocation
-      ? {
-          latitude: delivery.courierLocation.latitude,
-          longitude: delivery.courierLocation.longitude,
-        }
-      : null;
+    dto.courier_location =
+      delivery.courierLocation && delivery.locationUpdatedAt
+        ? {
+            latitude: delivery.courierLocation.latitude,
+            longitude: delivery.courierLocation.longitude,
+            updated_at: toUtcIsoSeconds(delivery.locationUpdatedAt),
+          }
+        : null;
     dto.eta_minutes = details.etaMinutes;
-    dto.accepted_at = delivery.acceptedAt?.toISOString() ?? null;
-    dto.picked_up_at = delivery.pickedUpAt?.toISOString() ?? null;
-    dto.delivered_at = delivery.deliveredAt?.toISOString() ?? null;
-    dto.created_at = delivery.createdAt.toISOString();
-    dto.updated_at = delivery.updatedAt.toISOString();
-    return dto;
+    return DeliveryTimestampsDto.assign(dto, delivery);
   }
 }

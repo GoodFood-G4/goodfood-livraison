@@ -10,10 +10,10 @@ import { JwtAuthGuard } from '../../shared/presentation/guards/jwt-auth.guard';
 import { RolesGuard } from '../../shared/presentation/guards/roles.guard';
 import { CreateAddressUseCase } from '../application/create-address.use-case';
 import { GetAddressUseCase } from '../application/get-address.use-case';
-import {
-  AddressNotGeocodableError,
-  NotAddressOwnerError,
-} from '../domain/errors';
+import { InMemoryAddressRepository } from '../../delivery/application/test-doubles';
+import { GeoPoint } from '../../shared/domain/geo-point';
+import { Address } from '../domain/address';
+import { AddressNotGeocodableError } from '../domain/errors';
 import { AddressController } from './address.controller';
 
 const JWT_SECRET = 'test-secret';
@@ -114,13 +114,48 @@ describe('AddressController', () => {
       .expect(422);
   });
 
-  it("403 si l'actor n'est pas le créateur de l'adresse", async () => {
-    getAddressUseCase.execute.mockRejectedValue(new NotAddressOwnerError());
+  describe('GET /addresses/:id avec le vrai use case', () => {
+    beforeEach(async () => {
+      const repository = new InMemoryAddressRepository();
+      await repository.save(
+        Address.create({
+          id: 'address-1',
+          country: 'France',
+          street: '2 Rue de Paris',
+          postalCode: '76600',
+          city: 'Le Havre',
+          location: GeoPoint.create(49.4938, 0.1077),
+          createdBy: 'owner-1',
+          createdAt: new Date('2026-11-11T21:55:25.785Z'),
+        }),
+      );
+      const real = new GetAddressUseCase(repository);
+      getAddressUseCase.execute.mockImplementation((input) =>
+        real.execute(input),
+      );
+    });
 
-    await request(app.getHttpServer())
-      .get('/addresses/address-1')
-      .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER)}`)
-      .expect(403);
+    it("404 (et non 403) si l'adresse appartient à un autre utilisateur, même corps qu'une adresse inconnue", async () => {
+      const other = await request(app.getHttpServer())
+        .get('/addresses/address-1')
+        .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER, 'user-2')}`)
+        .expect(404);
+      const missing = await request(app.getHttpServer())
+        .get('/addresses/inconnue')
+        .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER, 'user-2')}`)
+        .expect(404);
+
+      expect(other.body.error).toBe(missing.body.error);
+    });
+
+    it('200 pour le créateur, created_at en UTC à la seconde terminé par Z', async () => {
+      const { body } = await request(app.getHttpServer())
+        .get('/addresses/address-1')
+        .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER, 'owner-1')}`)
+        .expect(200);
+
+      expect(body.created_at).toBe('2026-11-11T21:55:25Z');
+    });
   });
 });
 

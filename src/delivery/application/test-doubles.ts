@@ -4,6 +4,7 @@ import { Clock } from '../../shared/application/ports/clock.port';
 import { IdGenerator } from '../../shared/application/ports/id-generator.port';
 import { Address } from '../../address/domain/address';
 import { AddressRepository } from '../../address/domain/address-repository.port';
+import { Geocoder, GeocodeQuery } from '../../address/domain/geocoder.port';
 import { Delivery } from '../domain/delivery';
 import {
   AvailableDeliveryResult,
@@ -13,6 +14,7 @@ import {
   DeliveryEventPayload,
   DeliveryEventPublisher,
 } from '../domain/delivery-event-publisher.port';
+import { TransactionalRepositories, UnitOfWork } from './unit-of-work.port';
 
 /**
  * Doublures en mémoire pour les tests de use cases : jamais de vraie base,
@@ -43,11 +45,13 @@ export class InMemoryDeliveryRepository implements DeliveryRepository {
     return this.activeCountByCourier.get(courierId) ?? 0;
   }
 
+  availableResults: AvailableDeliveryResult[] = [];
+
   async findAvailableWithinRadius(
     _center: GeoPoint,
     _radiusKm: number,
   ): Promise<AvailableDeliveryResult[]> {
-    return [];
+    return this.availableResults;
   }
 
   async findHistoryForCourier(
@@ -57,6 +61,21 @@ export class InMemoryDeliveryRepository implements DeliveryRepository {
   ): Promise<Paginated<Delivery>> {
     const all = [...this.deliveries.values()]
       .filter((delivery) => delivery.courierId === courierId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const start = (page - 1) * limit;
+    return {
+      data: all.slice(start, start + limit),
+      meta: { page, limit, total: all.length },
+    };
+  }
+
+  async findForCustomer(
+    customerId: string,
+    page: number,
+    limit: number,
+  ): Promise<Paginated<Delivery>> {
+    const all = [...this.deliveries.values()]
+      .filter((delivery) => delivery.customerId === customerId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     const start = (page - 1) * limit;
     return {
@@ -93,6 +112,77 @@ export class InMemoryAddressRepository implements AddressRepository {
 
   async findById(id: string): Promise<Address | null> {
     return this.addresses.get(id) ?? null;
+  }
+}
+
+/**
+ * Simule une transaction : les écritures vont dans des copies des
+ * repositories, recopiées dans les originaux seulement si `work` réussit.
+ * `failOn` permet de faire échouer une écriture en cours de transaction.
+ */
+export class InMemoryUnitOfWork implements UnitOfWork {
+  runCount = 0;
+  failOn: 'address' | 'delivery' | null = null;
+
+  constructor(
+    private readonly addressRepository: InMemoryAddressRepository,
+    private readonly deliveryRepository: InMemoryDeliveryRepository,
+  ) {}
+
+  async run<T>(
+    work: (repositories: TransactionalRepositories) => Promise<T>,
+  ): Promise<T> {
+    this.runCount += 1;
+    const addresses = new InMemoryAddressRepository();
+    const deliveries = new InMemoryDeliveryRepository();
+    this.addressRepository.addresses.forEach((a, id) =>
+      addresses.addresses.set(id, a),
+    );
+    this.deliveryRepository.deliveries.forEach((d, id) =>
+      deliveries.deliveries.set(id, d),
+    );
+
+    const failOn = this.failOn;
+    const transactional: TransactionalRepositories = {
+      addresses: {
+        save: async (address) => {
+          if (failOn === 'address') throw new Error('échec écriture adresse');
+          await addresses.save(address);
+        },
+        findById: (id) => addresses.findById(id),
+      },
+      deliveries: Object.assign(Object.create(deliveries), {
+        save: async (delivery: Delivery) => {
+          if (failOn === 'delivery')
+            throw new Error('échec écriture livraison');
+          await deliveries.save(delivery);
+        },
+      }) as InMemoryDeliveryRepository,
+    };
+
+    const result = await work(transactional);
+
+    addresses.addresses.forEach((a, id) =>
+      this.addressRepository.addresses.set(id, a),
+    );
+    deliveries.deliveries.forEach((d, id) =>
+      this.deliveryRepository.deliveries.set(id, d),
+    );
+    return result;
+  }
+}
+
+/** Retourne les réponses programmées dans l'ordre, puis un point par défaut. */
+export class ScriptedGeocoder implements Geocoder {
+  readonly queries: GeocodeQuery[] = [];
+
+  constructor(private readonly responses: Array<GeoPoint | null> = []) {}
+
+  async geocode(query: GeocodeQuery): Promise<GeoPoint | null> {
+    this.queries.push(query);
+    return this.responses.length > 0
+      ? (this.responses.shift() as GeoPoint | null)
+      : GeoPoint.create(49.4938, 0.1077);
   }
 }
 

@@ -13,8 +13,13 @@ import { CreateDeliveryUseCase } from '../application/create-delivery.use-case';
 import { GetDeliveryUseCase } from '../application/get-delivery.use-case';
 import { ListAvailableDeliveriesUseCase } from '../application/list-available-deliveries.use-case';
 import { ListCourierHistoryUseCase } from '../application/list-courier-history.use-case';
+import { ListCustomerDeliveriesUseCase } from '../application/list-customer-deliveries.use-case';
 import { UpdateCourierLocationUseCase } from '../application/update-courier-location.use-case';
 import { UpdateDeliveryStatusUseCase } from '../application/update-delivery-status.use-case';
+import {
+  buildAddress,
+  buildPendingDelivery,
+} from '../application/test-doubles';
 import { DuplicateOrderError } from '../domain/errors';
 import { DeliveryController } from './delivery.controller';
 
@@ -31,6 +36,7 @@ describe('DeliveryController', () => {
   const updateCourierLocationUseCase = { execute: jest.fn() };
   const getDeliveryUseCase = { execute: jest.fn() };
   const listCourierHistoryUseCase = { execute: jest.fn() };
+  const listCustomerDeliveriesUseCase = { execute: jest.fn() };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -55,6 +61,10 @@ describe('DeliveryController', () => {
         {
           provide: ListCourierHistoryUseCase,
           useValue: listCourierHistoryUseCase,
+        },
+        {
+          provide: ListCustomerDeliveriesUseCase,
+          useValue: listCustomerDeliveriesUseCase,
         },
         {
           provide: ConfigService,
@@ -94,6 +104,25 @@ describe('DeliveryController', () => {
 
   it('401 sans token', async () => {
     await request(app.getHttpServer()).get('/deliveries/any-id').expect(401);
+  });
+
+  it('401 si le token est expiré (claim exp dépassé)', async () => {
+    const nowInSeconds = Math.floor(Date.now() / 1000);
+    const expiredToken = jwtService.sign(
+      {
+        sub: '11111111-1111-4111-8111-111111111111',
+        role: Role.COURIER,
+        iat: nowInSeconds - 2 * 86400,
+        exp: nowInSeconds - 86400,
+      },
+      { algorithm: 'HS256' },
+    );
+
+    await request(app.getHttpServer())
+      .get('/deliveries/any-id')
+      .set('Authorization', `Bearer ${expiredToken}`)
+      .expect(401);
+    expect(getDeliveryUseCase.execute).not.toHaveBeenCalled();
   });
 
   it("403 si le rôle est insuffisant (client sur POST /deliveries réservé à l'admin)", async () => {
@@ -144,6 +173,34 @@ describe('DeliveryController', () => {
       .expect(409);
   });
 
+  it("GET /deliveries/available expose le retrait et la course, pas l'adresse du client", async () => {
+    listAvailableDeliveriesUseCase.execute.mockResolvedValue([
+      {
+        delivery: buildPendingDelivery(),
+        distanceKm: 0.456,
+        pickupAddress: buildAddress({ id: 'address-pickup' }),
+        tripDistanceKm: 1.2345,
+      },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/deliveries/available?lat=49.4938&lng=0.1077')
+      .set('Authorization', `Bearer ${tokenFor(Role.COURIER)}`)
+      .expect(200);
+
+    expect(response.body[0]).toMatchObject({
+      distance_km: 0.46,
+      trip_distance_km: 1.23,
+      pickup_address: {
+        id: 'address-pickup',
+        street: '2 Rue de Paris',
+        latitude: 49.4938,
+        longitude: 0.1077,
+      },
+    });
+    expect(response.body[0]).not.toHaveProperty('destination_address');
+  });
+
   it("GET /deliveries/available n'est pas capturée par :id", async () => {
     listAvailableDeliveriesUseCase.execute.mockResolvedValue([]);
 
@@ -169,6 +226,62 @@ describe('DeliveryController', () => {
 
     expect(listCourierHistoryUseCase.execute).toHaveBeenCalled();
     expect(getDeliveryUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('GET /deliveries/mine : livraisons du client du token, pas capturée par :id', async () => {
+    listCustomerDeliveriesUseCase.execute.mockResolvedValue({
+      data: [],
+      meta: { page: 2, limit: 5, total: 0 },
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/deliveries/mine?page=2&limit=5')
+      .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER, 'customer-1')}`)
+      .expect(200);
+
+    expect(listCustomerDeliveriesUseCase.execute).toHaveBeenCalledWith({
+      customerId: 'customer-1',
+      page: 2,
+      limit: 5,
+    });
+    expect(response.body).toEqual({
+      data: [],
+      meta: { page: 2, limit: 5, total: 0 },
+    });
+    expect(getDeliveryUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('GET /deliveries/mine : pagination par défaut (page 1, limit 20)', async () => {
+    listCustomerDeliveriesUseCase.execute.mockResolvedValue({
+      data: [],
+      meta: { page: 1, limit: 20, total: 0 },
+    });
+
+    await request(app.getHttpServer())
+      .get('/deliveries/mine')
+      .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER, 'customer-1')}`)
+      .expect(200);
+
+    expect(listCustomerDeliveriesUseCase.execute).toHaveBeenCalledWith({
+      customerId: 'customer-1',
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it('GET /deliveries/mine : 403 pour un livreur', async () => {
+    await request(app.getHttpServer())
+      .get('/deliveries/mine')
+      .set('Authorization', `Bearer ${tokenFor(Role.COURIER)}`)
+      .expect(403);
+    expect(listCustomerDeliveriesUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('GET /deliveries/mine : 400 si limit dépasse 100', async () => {
+    await request(app.getHttpServer())
+      .get('/deliveries/mine?limit=101')
+      .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER)}`)
+      .expect(400);
   });
 
   it('204 sur PATCH /deliveries/:id/location', async () => {

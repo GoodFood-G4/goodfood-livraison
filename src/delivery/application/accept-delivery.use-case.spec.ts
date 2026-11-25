@@ -51,6 +51,10 @@ class InMemoryDeliveryRepository implements DeliveryRepository {
   async findHistoryForCourier(): Promise<Paginated<Delivery>> {
     return { data: [], meta: { page: 1, limit: 20, total: 0 } };
   }
+
+  async findForCustomer(): Promise<Paginated<Delivery>> {
+    return { data: [], meta: { page: 1, limit: 20, total: 0 } };
+  }
 }
 
 class FakeDeliveryEventPublisher implements DeliveryEventPublisher {
@@ -120,6 +124,10 @@ describe('AcceptDeliveryUseCase', () => {
     expect(result.courierId).toBe('courier-1');
     expect(publisher.published).toHaveLength(1);
     expect(publisher.published[0].event).toBe('assigned');
+    // Date de l'événement = date stockée (assigned_at de GET /deliveries/:id).
+    expect(publisher.published[0].payload.occurredAt).toBe(
+      repository.deliveries.get('delivery-1')?.acceptedAt,
+    );
   });
 
   it("lève DeliveryNotFoundError si la livraison n'existe pas", async () => {

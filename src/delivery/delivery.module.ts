@@ -17,6 +17,7 @@ import { GetDeliveryUseCase } from './application/get-delivery.use-case';
 import { HandleOrderReadyUseCase } from './application/handle-order-ready.use-case';
 import { ListAvailableDeliveriesUseCase } from './application/list-available-deliveries.use-case';
 import { ListCourierHistoryUseCase } from './application/list-courier-history.use-case';
+import { ListCustomerDeliveriesUseCase } from './application/list-customer-deliveries.use-case';
 import { UpdateCourierLocationUseCase } from './application/update-courier-location.use-case';
 import { UpdateDeliveryStatusUseCase } from './application/update-delivery-status.use-case';
 import { DeliveryOrmEntity } from './infrastructure/persistence/delivery.orm-entity';
@@ -43,6 +44,7 @@ import { DeliveryController } from './presentation/delivery.controller';
     GetDeliveryUseCase,
     ListAvailableDeliveriesUseCase,
     ListCourierHistoryUseCase,
+    ListCustomerDeliveriesUseCase,
     HandleOrderReadyUseCase,
     OrderReadyConsumer,
     { provide: DELIVERY_REPOSITORY, useClass: TypeOrmDeliveryRepository },

@@ -29,4 +29,11 @@ export interface DeliveryRepository {
     page: number,
     limit: number,
   ): Promise<Paginated<Delivery>>;
+
+  /** Livraisons dont `customer_id` est ce client, plus récentes en premier. */
+  findForCustomer(
+    customerId: string,
+    page: number,
+    limit: number,
+  ): Promise<Paginated<Delivery>>;
 }

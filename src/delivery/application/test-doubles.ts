@@ -68,6 +68,21 @@ export class InMemoryDeliveryRepository implements DeliveryRepository {
       meta: { page, limit, total: all.length },
     };
   }
+
+  async findForCustomer(
+    customerId: string,
+    page: number,
+    limit: number,
+  ): Promise<Paginated<Delivery>> {
+    const all = [...this.deliveries.values()]
+      .filter((delivery) => delivery.customerId === customerId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const start = (page - 1) * limit;
+    return {
+      data: all.slice(start, start + limit),
+      meta: { page, limit, total: all.length },
+    };
+  }
 }
 
 export class FakeDeliveryEventPublisher implements DeliveryEventPublisher {

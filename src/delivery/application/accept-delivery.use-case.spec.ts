@@ -51,6 +51,10 @@ class InMemoryDeliveryRepository implements DeliveryRepository {
   async findHistoryForCourier(): Promise<Paginated<Delivery>> {
     return { data: [], meta: { page: 1, limit: 20, total: 0 } };
   }
+
+  async findForCustomer(): Promise<Paginated<Delivery>> {
+    return { data: [], meta: { page: 1, limit: 20, total: 0 } };
+  }
 }
 
 class FakeDeliveryEventPublisher implements DeliveryEventPublisher {

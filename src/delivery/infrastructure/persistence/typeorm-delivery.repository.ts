@@ -154,4 +154,22 @@ export class TypeOrmDeliveryRepository implements DeliveryRepository {
       meta: { page, limit, total },
     };
   }
+
+  async findForCustomer(
+    customerId: string,
+    page: number,
+    limit: number,
+  ): Promise<Paginated<Delivery>> {
+    const [entities, total] = await this.repository.findAndCount({
+      where: { customerId },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      data: entities.map((entity) => DeliveryMapper.toDomain(entity)),
+      meta: { page, limit, total },
+    };
+  }
 }

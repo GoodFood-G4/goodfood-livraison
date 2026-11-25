@@ -8,6 +8,7 @@ export class DeliveryOrmEntity {
   @Column({ name: 'order_id', type: 'uuid', unique: true })
   orderId!: string;
 
+  @Index('IDX_deliveries_customer_id')
   @Column({ name: 'customer_id', type: 'uuid', nullable: true })
   customerId!: string | null;
 

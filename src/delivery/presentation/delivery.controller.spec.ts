@@ -13,6 +13,7 @@ import { CreateDeliveryUseCase } from '../application/create-delivery.use-case';
 import { GetDeliveryUseCase } from '../application/get-delivery.use-case';
 import { ListAvailableDeliveriesUseCase } from '../application/list-available-deliveries.use-case';
 import { ListCourierHistoryUseCase } from '../application/list-courier-history.use-case';
+import { ListCustomerDeliveriesUseCase } from '../application/list-customer-deliveries.use-case';
 import { UpdateCourierLocationUseCase } from '../application/update-courier-location.use-case';
 import { UpdateDeliveryStatusUseCase } from '../application/update-delivery-status.use-case';
 import {
@@ -35,6 +36,7 @@ describe('DeliveryController', () => {
   const updateCourierLocationUseCase = { execute: jest.fn() };
   const getDeliveryUseCase = { execute: jest.fn() };
   const listCourierHistoryUseCase = { execute: jest.fn() };
+  const listCustomerDeliveriesUseCase = { execute: jest.fn() };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -59,6 +61,10 @@ describe('DeliveryController', () => {
         {
           provide: ListCourierHistoryUseCase,
           useValue: listCourierHistoryUseCase,
+        },
+        {
+          provide: ListCustomerDeliveriesUseCase,
+          useValue: listCustomerDeliveriesUseCase,
         },
         {
           provide: ConfigService,
@@ -220,6 +226,62 @@ describe('DeliveryController', () => {
 
     expect(listCourierHistoryUseCase.execute).toHaveBeenCalled();
     expect(getDeliveryUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('GET /deliveries/mine : livraisons du client du token, pas capturée par :id', async () => {
+    listCustomerDeliveriesUseCase.execute.mockResolvedValue({
+      data: [],
+      meta: { page: 2, limit: 5, total: 0 },
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/deliveries/mine?page=2&limit=5')
+      .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER, 'customer-1')}`)
+      .expect(200);
+
+    expect(listCustomerDeliveriesUseCase.execute).toHaveBeenCalledWith({
+      customerId: 'customer-1',
+      page: 2,
+      limit: 5,
+    });
+    expect(response.body).toEqual({
+      data: [],
+      meta: { page: 2, limit: 5, total: 0 },
+    });
+    expect(getDeliveryUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('GET /deliveries/mine : pagination par défaut (page 1, limit 20)', async () => {
+    listCustomerDeliveriesUseCase.execute.mockResolvedValue({
+      data: [],
+      meta: { page: 1, limit: 20, total: 0 },
+    });
+
+    await request(app.getHttpServer())
+      .get('/deliveries/mine')
+      .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER, 'customer-1')}`)
+      .expect(200);
+
+    expect(listCustomerDeliveriesUseCase.execute).toHaveBeenCalledWith({
+      customerId: 'customer-1',
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it('GET /deliveries/mine : 403 pour un livreur', async () => {
+    await request(app.getHttpServer())
+      .get('/deliveries/mine')
+      .set('Authorization', `Bearer ${tokenFor(Role.COURIER)}`)
+      .expect(403);
+    expect(listCustomerDeliveriesUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('GET /deliveries/mine : 400 si limit dépasse 100', async () => {
+    await request(app.getHttpServer())
+      .get('/deliveries/mine?limit=101')
+      .set('Authorization', `Bearer ${tokenFor(Role.CUSTOMER)}`)
+      .expect(400);
   });
 
   it('204 sur PATCH /deliveries/:id/location', async () => {

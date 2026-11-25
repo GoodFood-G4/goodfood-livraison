@@ -18,6 +18,7 @@ import { CreateDeliveryUseCase } from '../application/create-delivery.use-case';
 import { GetDeliveryUseCase } from '../application/get-delivery.use-case';
 import { ListAvailableDeliveriesUseCase } from '../application/list-available-deliveries.use-case';
 import { ListCourierHistoryUseCase } from '../application/list-courier-history.use-case';
+import { ListCustomerDeliveriesUseCase } from '../application/list-customer-deliveries.use-case';
 import { UpdateCourierLocationUseCase } from '../application/update-courier-location.use-case';
 import { UpdateDeliveryStatusUseCase } from '../application/update-delivery-status.use-case';
 import { AvailableDeliveryResponseDto } from './dto/available-delivery-response.dto';
@@ -45,6 +46,7 @@ export class DeliveryController {
     private readonly updateCourierLocationUseCase: UpdateCourierLocationUseCase,
     private readonly getDeliveryUseCase: GetDeliveryUseCase,
     private readonly listCourierHistoryUseCase: ListCourierHistoryUseCase,
+    private readonly listCustomerDeliveriesUseCase: ListCustomerDeliveriesUseCase,
   ) {}
 
   @Post()
@@ -97,6 +99,26 @@ export class DeliveryController {
   ): Promise<DeliveryHistoryResponseDto> {
     const paginated = await this.listCourierHistoryUseCase.execute({
       courierId: actor.userId,
+      page: query.page ?? DEFAULT_HISTORY_PAGE,
+      limit: query.limit ?? DEFAULT_HISTORY_LIMIT,
+    });
+    return DeliveryHistoryResponseDto.fromPaginated(paginated);
+  }
+
+  // Doit être déclaré avant @Get(':id') pour ne pas être capturé par celui-ci.
+  @Get('mine')
+  @Roles(Role.CUSTOMER)
+  @ApiResponse({
+    status: 200,
+    description:
+      'Livraisons du client connecté (customer_id = sub du token), paginées, plus récentes en premier',
+  })
+  async mine(
+    @Query() query: HistoryQueryDto,
+    @CurrentActor() actor: Actor,
+  ): Promise<DeliveryHistoryResponseDto> {
+    const paginated = await this.listCustomerDeliveriesUseCase.execute({
+      customerId: actor.userId,
       page: query.page ?? DEFAULT_HISTORY_PAGE,
       limit: query.limit ?? DEFAULT_HISTORY_LIMIT,
     });

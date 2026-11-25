@@ -14,6 +14,7 @@ import { CreateDeliveryUseCase } from '../application/create-delivery.use-case';
 import { GetDeliveryUseCase } from '../application/get-delivery.use-case';
 import { ListAvailableDeliveriesUseCase } from '../application/list-available-deliveries.use-case';
 import { ListCourierHistoryUseCase } from '../application/list-courier-history.use-case';
+import { ListCustomerDeliveriesUseCase } from '../application/list-customer-deliveries.use-case';
 import { UpdateCourierLocationUseCase } from '../application/update-courier-location.use-case';
 import { UpdateDeliveryStatusUseCase } from '../application/update-delivery-status.use-case';
 import {
@@ -71,6 +72,7 @@ describe('DeliveryController (cycle de vie, use cases réels)', () => {
         { provide: CreateDeliveryUseCase, useValue: unused },
         { provide: ListAvailableDeliveriesUseCase, useValue: unused },
         { provide: ListCourierHistoryUseCase, useValue: unused },
+        { provide: ListCustomerDeliveriesUseCase, useValue: unused },
         {
           provide: AcceptDeliveryUseCase,
           useValue: new AcceptDeliveryUseCase(deliveries, publisher, clock, 3),

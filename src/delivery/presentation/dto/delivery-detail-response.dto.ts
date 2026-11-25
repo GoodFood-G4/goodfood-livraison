@@ -4,7 +4,7 @@ import { toUtcIsoSeconds } from '../../../shared/application/utc-date-format';
 import { DeliveryDetails } from '../../application/get-delivery.use-case';
 import { DeliveryTimestampsDto } from './delivery-response.dto';
 
-class AddressSummaryDto {
+export class AddressSummaryDto {
   @ApiProperty() id!: string;
   @ApiProperty() country!: string;
   @ApiProperty() street!: string;

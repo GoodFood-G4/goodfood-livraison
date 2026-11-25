@@ -45,11 +45,13 @@ export class InMemoryDeliveryRepository implements DeliveryRepository {
     return this.activeCountByCourier.get(courierId) ?? 0;
   }
 
+  availableResults: AvailableDeliveryResult[] = [];
+
   async findAvailableWithinRadius(
     _center: GeoPoint,
     _radiusKm: number,
   ): Promise<AvailableDeliveryResult[]> {
-    return [];
+    return this.availableResults;
   }
 
   async findHistoryForCourier(

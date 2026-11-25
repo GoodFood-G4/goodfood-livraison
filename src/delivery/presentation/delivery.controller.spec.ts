@@ -15,6 +15,10 @@ import { ListAvailableDeliveriesUseCase } from '../application/list-available-de
 import { ListCourierHistoryUseCase } from '../application/list-courier-history.use-case';
 import { UpdateCourierLocationUseCase } from '../application/update-courier-location.use-case';
 import { UpdateDeliveryStatusUseCase } from '../application/update-delivery-status.use-case';
+import {
+  buildAddress,
+  buildPendingDelivery,
+} from '../application/test-doubles';
 import { DuplicateOrderError } from '../domain/errors';
 import { DeliveryController } from './delivery.controller';
 
@@ -161,6 +165,34 @@ describe('DeliveryController', () => {
         address_id: '22222222-2222-4222-8222-222222222222',
       })
       .expect(409);
+  });
+
+  it("GET /deliveries/available expose le retrait et la course, pas l'adresse du client", async () => {
+    listAvailableDeliveriesUseCase.execute.mockResolvedValue([
+      {
+        delivery: buildPendingDelivery(),
+        distanceKm: 0.456,
+        pickupAddress: buildAddress({ id: 'address-pickup' }),
+        tripDistanceKm: 1.2345,
+      },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/deliveries/available?lat=49.4938&lng=0.1077')
+      .set('Authorization', `Bearer ${tokenFor(Role.COURIER)}`)
+      .expect(200);
+
+    expect(response.body[0]).toMatchObject({
+      distance_km: 0.46,
+      trip_distance_km: 1.23,
+      pickup_address: {
+        id: 'address-pickup',
+        street: '2 Rue de Paris',
+        latitude: 49.4938,
+        longitude: 0.1077,
+      },
+    });
+    expect(response.body[0]).not.toHaveProperty('destination_address');
   });
 
   it("GET /deliveries/available n'est pas capturée par :id", async () => {

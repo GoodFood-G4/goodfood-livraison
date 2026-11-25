@@ -68,7 +68,8 @@ export class DeliveryController {
   @Roles(Role.COURIER)
   @ApiResponse({
     status: 200,
-    description: 'Livraisons pending dans le rayon, triées par distance',
+    description:
+      "Livraisons pending dans le rayon, triées par distance. Adresse de retrait et longueur de la course incluses ; l'adresse du client n'est pas exposée.",
   })
   async listAvailable(
     @Query() query: ListAvailableQueryDto,
@@ -78,8 +79,8 @@ export class DeliveryController {
       longitude: query.lng,
       radiusKm: query.radius,
     });
-    return results.map((result) =>
-      AvailableDeliveryResponseDto.fromResult(result),
+    return results.map((offer) =>
+      AvailableDeliveryResponseDto.fromOffer(offer),
     );
   }
 
